@@ -1,6 +1,6 @@
-gym==0.17.3
-matplotlib
-numpy
+matplotlib==3.3.3
+numpy==1.19.4
 wandb
-stable-baselines3=0.10.0
+gym==0.17.3
+stable-baselines3==0.10.0
 gym-racecar
