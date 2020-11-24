@@ -77,16 +77,6 @@ def train(config):
 
 if __name__ == '__main__':
 
-    config = json.loads('{"lr":3e-4,\
-                          "steps":500000,\
-                          "net_arch":[256,256],\
-                          "seed": 1,\
-                          "action_obs": true,\
-                          "activation_fn": "relu",\
-                          "wandb_name": "learn_to_race",\
-                          "eval_freq": 10000,\
-                          "rollout_steps": 2048,\
-                          "batch_size": 64,\
-                          "n_epochs": 10,\
-                          "gamma": 0.995}')
+    config = json.load(open('config.json'))
+
     train(config)
