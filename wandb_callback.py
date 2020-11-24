@@ -1,11 +1,13 @@
 import numpy as np
 import gym
 import wandb
+
 from stable_baselines3.common.callbacks import BaseCallback
-# from gym.wrappers.monitoring.video_recorder import ImageEncoder
+from stable_baselines3.common.vec_env import VecVideoRecorder
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, sync_envs_normalization
 from typing import Any, Dict, Optional, Union, Tuple
+from stable_baselines3 import PPO
 import os
 import warnings
 
@@ -34,35 +36,42 @@ class WandbCallback(BaseCallback):
     def __init__(
             self,
             eval_env: Union[gym.Env, VecEnv],
-            callback_on_new_best: Optional[BaseCallback] = None,
+            hard_eval_env: Union[gym.Env, VecEnv],
             n_eval_episodes: int = 5,
+            n_final_eval_episodes: int = 20,
             eval_freq: int = 10000,
             train_freq: int = 2048,
             log_path: str = None,
             best_model_save_path: str = None,
             deterministic: bool = True,
             render: bool = False,
-            verbose: int = 1,
+            wandb_name: str = "test",
+            config: dict = {},
             warn: bool = True,
     ):
-        super(WandbCallback, self).__init__(verbose)
+        super(WandbCallback, self).__init__(verbose=1)
         self.n_eval_episodes = n_eval_episodes
+        self.n_final_eval_episodes = n_final_eval_episodes
         self.eval_freq = eval_freq
         self.train_freq = train_freq
         self.best_mean_reward = -np.inf
         self.last_mean_reward = -np.inf
         self.deterministic = deterministic
         self.render = render
-        self.warn = warn
+
+        self.steps = 0
 
         # Convert to VecEnv for consistency
         if not isinstance(eval_env, VecEnv):
             eval_env = DummyVecEnv([lambda: eval_env])
+        if not isinstance(hard_eval_env, VecEnv):
+            hard_eval_env = DummyVecEnv([lambda: hard_eval_env])
 
         if isinstance(eval_env, VecEnv):
             assert eval_env.num_envs == 1, "You must pass only one environment for evaluation"
 
         self.eval_env = eval_env
+        self.hard_eval_env = hard_eval_env
         self.best_model_save_path = best_model_save_path
         # Logs will be written in ``evaluations.npz``
         if log_path is not None:
@@ -72,13 +81,7 @@ class WandbCallback(BaseCallback):
         self.evaluations_timesteps = []
         self.evaluations_length = []
 
-        # self._video_path = Path('video')
-        # self._video_path.mkdir(parents=True, exist_ok=True)
-        # self._ckpt_dir = Path('ckpt')
-        # self._ckpt_dir.mkdir(parents=True, exist_ok=True)
-
-        # wandb.init(project=cfg.wb_project, dir=save_dir, name=cfg.wb_runname)
-        wandb.init(project = "learning-to-race")#, name=cfg.wb_name, notes=cfg.wb_notes, tags=cfg.wb_tags)
+        wandb.init(project=wandb_name,config=config)
 
 
     def _init_callback(self) -> None:
@@ -92,7 +95,7 @@ class WandbCallback(BaseCallback):
         if self.log_path is not None:
             os.makedirs(os.path.dirname(self.log_path), exist_ok=True)
 
-        wandb.watch(self.model.policy, log_freq=100)
+        wandb.watch(self.model.policy, log="all", log_freq=100)
 
     def _on_step(self) -> bool:
 
@@ -101,7 +104,6 @@ class WandbCallback(BaseCallback):
 
         if self.eval_freq > 0 and self.n_calls % self.eval_freq == 0:
             # Sync training and eval env if there is VecNormalize
-
             sync_envs_normalization(self.training_env, self.eval_env)
 
             episode_rewards, episode_lengths = evaluate_policy(
@@ -133,22 +135,106 @@ class WandbCallback(BaseCallback):
                     f"Eval num_timesteps={self.num_timesteps}, " f"episode_reward={mean_reward:.2f} +/- {std_reward:.2f}")
                 print(f"Episode length: {mean_ep_length:.2f} +/- {std_ep_length:.2f}")
             # Add to current Logger
-            wandb.log({"eval/mean_reward": float(mean_reward)})
-            wandb.log({"eval/mean_ep_length": mean_ep_length})
+            wandb.log({"eval/mean_reward": float(mean_reward)},step=self.model.num_timesteps)
+            wandb.log({"eval/mean_ep_length": mean_ep_length},step=self.model.num_timesteps)
+            wandb.log({"eval/reward_hist": wandb.Histogram(episode_rewards)},step=self.model.num_timesteps)
+            wandb.log({"eval/ep_length_hist": wandb.Histogram(episode_lengths)},step=self.model.num_timesteps)
 
             if mean_reward > self.best_mean_reward:
-                if self.verbose > 0:
-                    print("New best mean reward!")
+                print("New best mean reward!")
                 if self.best_model_save_path is not None:
                     self.model.save(os.path.join(self.best_model_save_path, "best_model"))
                 self.best_mean_reward = mean_reward
-                # # Trigger callback if needed
-                # if self.callback is not None:
-                #     return self._on_event()
 
+            video_folder = 'logs/videos/'
+            video_length = 400
+            steering_list = []
+            duty_cycle_list = []
+            # Record the video starting at the first step
+            video_eval_env = VecVideoRecorder(self.eval_env, video_folder,record_video_trigger=lambda x: x == 0,
+                                   video_length=video_length,
+                                   name_prefix = "race_car")
+            obs = video_eval_env.reset()
+            for _ in range(video_length + 1):
+                action, _ = self.model.predict(obs)
+                steering_list.append(action[0][0])
+                # steering_list.append(action[0][1])
+                duty_cycle_list.append(action[0][0])
+                obs, _, _, _ = video_eval_env.step(action)
+            video_eval_env.close()
 
+            wandb.log({"action_eval/steering_box_hist": wandb.Histogram(steering_list)}, step=self.model.num_timesteps)
+            wandb.log({"action_eval/duty_cycle_box_hist": wandb.Histogram(duty_cycle_list)}, step=self.model.num_timesteps)
+
+            wandb.log({f'video/{self.model.num_timesteps}': wandb.Video(video_folder+'race_car-step-0-to-step-400.mp4')},step=self.model.num_timesteps)
 
         return True
+
+    def _on_training_end(self) -> None:
+
+        self._final_eval(self.model,self.eval_env,'final')
+        # self._final_eval(self.model, self.hard_eval_env, 'final_hard')
+        #
+        # model = PPO.load(os.path.join(self.best_model_save_path, "best_model"))
+        # self._final_eval(model, self.eval_env, 'best')
+        # self._final_eval(model, self.hard_eval_env, 'best_hard')
+
+    def _final_eval(self,model,eval_env,mode):
+        # Sync training and eval env if there is VecNormalize
+        sync_envs_normalization(self.training_env, eval_env)
+
+        episode_rewards, episode_lengths = evaluate_policy(
+            model,
+            eval_env,
+            n_eval_episodes=self.n_final_eval_episodes,
+            render=self.render,
+            deterministic=self.deterministic,
+            return_episode_rewards=True,
+        )
+
+        mean_reward, std_reward = np.mean(episode_rewards), np.std(episode_rewards)
+        mean_ep_length, std_ep_length = np.mean(episode_lengths), np.std(episode_lengths)
+        self.last_mean_reward = mean_reward
+
+        print("Eval " + mode + f"episode_reward={mean_reward:.2f} +/- {std_reward:.2f}")
+        print(f"Episode length: {mean_ep_length:.2f} +/- {std_ep_length:.2f}")
+        # Add to current Logger
+        wandb.log({mode+"/mean_reward": float(mean_reward)}, step=self.model.num_timesteps)
+        wandb.log({mode+"/mean_ep_length": mean_ep_length}, step=self.model.num_timesteps)
+
+        data_r = [[r[0]] for r in episode_rewards]
+        data_l = [[float(l)+1e-9] for l in episode_lengths]
+        table_reward = wandb.Table(data=data_r, columns=["reward"])
+        wandb.log({mode+"/reward_hist": wandb.plot.histogram(table_reward, value="reward")})
+        table_ep_length = wandb.Table(data=data_l, columns=["length"])
+        wandb.log({mode + "/ep_length_hist": wandb.plot.histogram(table_ep_length, value="length")})
+
+
+
+        video_folder = 'logs/videos/'
+        video_length = 400
+        steering_list = []
+        duty_cycle_list = []
+        # Record the video starting at the first step
+        video_eval_env = VecVideoRecorder(eval_env, video_folder,record_video_trigger=lambda x: x == 0,
+                                   video_length=video_length,
+                                   name_prefix = "race_car")
+        obs = video_eval_env.reset()
+        for _ in range(video_length + 1):
+            action, _ = model.predict(obs)
+            steering_list.append(action[0][0])
+            # steering_list.append(action[0][1])
+            duty_cycle_list.append(action[0][0])
+            obs, _, _, _ = video_eval_env.step(action)
+        video_eval_env.close()
+
+        wandb.log({mode+"/steering_box_hist": wandb.Histogram(steering_list)}, step=self.model.num_timesteps)
+        wandb.log({mode+"/duty_cycle_box_hist": wandb.Histogram(duty_cycle_list)}, step=self.model.num_timesteps)
+
+        wandb.log({mode+"/video": wandb.Video(video_folder+'race_car-step-0-to-step-400.mp4')},step=self.model.num_timesteps)
+
+
+
 
     def write(self, key_values: Dict[str, Any], key_excluded: Dict[str, Union[str, Tuple[str, ...]]]) -> None:
 
@@ -158,10 +244,6 @@ class WandbCallback(BaseCallback):
                 continue
 
             if isinstance(value, np.ScalarType):
-                wandb.log({key:value})
+                wandb.log({key:value},step=self.model.num_timesteps)
 
-            # if isinstance(value, th.Tensor):
-            #     self.writer.add_histogram(key, value, step)
-            #
-            # if isinstance(value, Video):
-            #     self.writer.add_video(key, value.frames, step, value.fps)
+

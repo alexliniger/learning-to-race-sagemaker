@@ -1,6 +1,6 @@
-matplotlib==3.3.3
-numpy==1.19.4
-wandb
-gym==0.17.3
-stable-baselines3==0.10.0
-gym-racecar
+# matplotlib==3.3.3
+# numpy==1.19.4
+# wandb
+# gym==0.17.3
+# stable-baselines3==0.10.0
+--editable git+https://github.com/alexliniger/gym-racecar@main#egg=gym_racecar
