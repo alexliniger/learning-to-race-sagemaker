@@ -4,6 +4,7 @@ import wandb
 
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import VecVideoRecorder
+from gym.wrappers.monitoring.video_recorder import ImageEncoder
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, sync_envs_normalization
 from typing import Any, Dict, Optional, Union, Tuple
@@ -146,27 +147,31 @@ class WandbCallback(BaseCallback):
                     self.model.save(os.path.join(self.best_model_save_path, "best_model"))
                 self.best_mean_reward = mean_reward
 
-            video_folder = 'logs/videos/'
+            eval_video_path = 'logs/videos/eval.mp4'
             video_length = 400
             steering_list = []
             duty_cycle_list = []
             # Record the video starting at the first step
-            video_eval_env = VecVideoRecorder(self.eval_env, video_folder,record_video_trigger=lambda x: x == 0,
-                                   video_length=video_length,
-                                   name_prefix = "race_car")
-            obs = video_eval_env.reset()
+            list_render = []
+            obs = self.eval_env.reset()
+            list_render.append(self.eval_env.render(mode='rgb_array'))
             for _ in range(video_length + 1):
                 action, _ = self.model.predict(obs)
                 steering_list.append(action[0][0])
                 # steering_list.append(action[0][1])
                 duty_cycle_list.append(action[0][0])
-                obs, _, _, _ = video_eval_env.step(action)
-            video_eval_env.close()
+                obs, _, _, _ = self.eval_env.step(action)
+                list_render.append(self.eval_env.render(mode='rgb_array'))
+
+            encoder = ImageEncoder(eval_video_path, list_render[0].shape, 30, 30)
+            for im in list_render:
+                encoder.capture_frame(im)
+            encoder.close()
 
             wandb.log({"action_eval/steering_box_hist": wandb.Histogram(steering_list)}, step=self.model.num_timesteps)
             wandb.log({"action_eval/duty_cycle_box_hist": wandb.Histogram(duty_cycle_list)}, step=self.model.num_timesteps)
 
-            wandb.log({f'video/{self.model.num_timesteps}': wandb.Video(video_folder+'race_car-step-0-to-step-400.mp4')},step=self.model.num_timesteps)
+            wandb.log({f'video/{self.model.num_timesteps}': wandb.Video(eval_video_path)}, step=self.model.num_timesteps)
 
         return True
 
@@ -209,29 +214,31 @@ class WandbCallback(BaseCallback):
         table_ep_length = wandb.Table(data=data_l, columns=["length"])
         wandb.log({mode + "/ep_length_hist": wandb.plot.histogram(table_ep_length, value="length")})
 
-
-
-        video_folder = 'logs/videos/'
+        eval_video_path = 'logs/videos/'+mode+'_eval.mp4'
         video_length = 400
         steering_list = []
         duty_cycle_list = []
         # Record the video starting at the first step
-        video_eval_env = VecVideoRecorder(eval_env, video_folder,record_video_trigger=lambda x: x == 0,
-                                   video_length=video_length,
-                                   name_prefix = "race_car")
-        obs = video_eval_env.reset()
+        list_render = []
+        obs = eval_env.reset()
+        list_render.append(eval_env.render(mode='rgb_array'))
         for _ in range(video_length + 1):
             action, _ = model.predict(obs)
             steering_list.append(action[0][0])
             # steering_list.append(action[0][1])
             duty_cycle_list.append(action[0][0])
-            obs, _, _, _ = video_eval_env.step(action)
-        video_eval_env.close()
+            obs, _, _, _ = eval_env.step(action)
+            list_render.append(eval_env.render(mode='rgb_array'))
+
+        encoder = ImageEncoder(eval_video_path, list_render[0].shape, 30, 30)
+        for im in list_render:
+            encoder.capture_frame(im)
+        encoder.close()
 
         wandb.log({mode+"/steering_box_hist": wandb.Histogram(steering_list)}, step=self.model.num_timesteps)
         wandb.log({mode+"/duty_cycle_box_hist": wandb.Histogram(duty_cycle_list)}, step=self.model.num_timesteps)
 
-        wandb.log({mode+"/video": wandb.Video(video_folder+'race_car-step-0-to-step-400.mp4')},step=self.model.num_timesteps)
+        wandb.log({mode+"/video": wandb.Video(eval_video_path)}, step=self.model.num_timesteps)
 
 
 
