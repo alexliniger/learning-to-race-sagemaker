@@ -27,14 +27,14 @@ def train(args,config):
 
     logs_dir = Path('logs')
     logs_dir.mkdir(parents=True, exist_ok=True)
-
-    # env = gym.make('Pendulum-v0')
-    # eval_env = gym.make('Pendulum-v0')
-    # hard_eval_env = gym.make('Pendulum-v0')
-
-    env = gym.make('gym_racecar:RaceCar-v0', action_obs=action_obs)
-    eval_env = gym.make('gym_racecar:RaceCar-v0', action_obs=action_obs)
-    hard_eval_env = gym.make('gym_racecar:RaceCarRealistic-v0', action_obs=action_obs)
+    if config["env"] == "racecar":
+        env = gym.make('gym_racecar:RaceCar-v0', action_obs=action_obs)
+        eval_env = gym.make('gym_racecar:RaceCar-v0', action_obs=action_obs)
+        hard_eval_env = gym.make('gym_racecar:RaceCarRealistic-v0', action_obs=action_obs)
+    else:
+        env = gym.make('Pendulum-v0')
+        eval_env = gym.make('Pendulum-v0')
+        hard_eval_env = gym.make('Pendulum-v0')
 
     env = Monitor(env, log_dir)
 
