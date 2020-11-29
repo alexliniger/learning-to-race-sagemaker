@@ -14,5 +14,6 @@
     "batch_size": 32,
     "n_epochs": 10,
     "gamma": 0.99
-    "env": "racecar"
+    "env": "racecar",
+    "video_log": true
 }

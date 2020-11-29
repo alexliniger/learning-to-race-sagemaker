@@ -2,9 +2,6 @@ import argparse
 import json
 import os
 import sagemaker_containers
-import sys
-from gym_racecar.envs import race_car_center_line_env
-from gym_racecar.envs import race_car_center_line_realistic_env
 
 import gym
 import numpy as np
@@ -14,9 +11,6 @@ import wandb_callback
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
 
-
-import subprocess
-import sys
 from pathlib import Path
 
 
@@ -43,7 +37,7 @@ def train(args,config):
                                                    log_path='./logs/',
                                                    eval_freq=config["eval_freq"], train_freq=config["rollout_steps"],
                                                    n_eval_episodes=10, n_final_eval_episodes=50,
-                                                   deterministic=True, render=False, video=True,
+                                                   deterministic=True, render=False, video=config["video_log"],
                                                    wandb_name=config["wandb_name"], config=config)
 
     if config["activation_fn"] == "relu":
@@ -66,8 +60,6 @@ def train(args,config):
     del eval_env
     del hard_eval_env
 
-
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -77,7 +69,7 @@ if __name__ == '__main__':
                         help='backend for distributed training (tcp, gloo on cpu and gloo, nccl on gpu)')
 
     # Container environment
-    parser.add_argument('--hosts', type=list, default=json.jsonloads(os.environ['SM_HOSTS']))
+    parser.add_argument('--hosts', type=list, default=json.loads(os.environ['SM_HOSTS']))
     parser.add_argument('--current-host', type=str, default=os.environ['SM_CURRENT_HOST'])
     parser.add_argument('--model-dir', type=str, default=os.environ['SM_MODEL_DIR'])
     #     parser.add_argument('--data-dir', type=str, default=os.environ['SM_CHANNEL_TRAINING'])
