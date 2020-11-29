@@ -190,11 +190,11 @@ class WandbCallback(BaseCallback):
     def _on_training_end(self) -> None:
 
         self._final_eval(self.model,self.eval_env,'final')
-        # self._final_eval(self.model, self.hard_eval_env, 'final_hard')
-        #
-        # model = PPO.load(os.path.join(self.best_model_save_path, "best_model"))
-        # self._final_eval(model, self.eval_env, 'best')
-        # self._final_eval(model, self.hard_eval_env, 'best_hard')
+        self._final_eval(self.model, self.hard_eval_env, 'final_hard')
+
+        model = PPO.load(os.path.join(self.best_model_save_path, "best_model"))
+        self._final_eval(model, self.eval_env, 'best')
+        self._final_eval(model, self.hard_eval_env, 'best_hard')
 
     def _final_eval(self,model,eval_env,mode):
         # Sync training and eval env if there is VecNormalize
