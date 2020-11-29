@@ -1,17 +1,17 @@
 {
-    "lr": 1,
-    "steps": 500000,
+    "lr": 0.0003,
+    "steps": 700000.0,
     "net_arch": [
-        256,
-        256
+        128,
+        128
     ],
     "seed": 1,
     "action_obs": true,
-    "activation_fn": "relu",
+    "activation_fn": "tanh",
     "wandb_name": "learn_to_race",
     "eval_freq": 10000,
     "rollout_steps": 2048,
-    "batch_size": 64,
+    "batch_size": 32,
     "n_epochs": 10,
-    "gamma": 0.995
+    "gamma": 0.99
 }

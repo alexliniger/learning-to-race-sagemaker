@@ -1,8 +1,10 @@
 import argparse
 import json
 import os
-# import sagemaker_containers
+import sagemaker_containers
 import sys
+from gym_racecar.envs import race_car_center_line_env
+from gym_racecar.envs import race_car_center_line_realistic_env
 
 import gym
 import numpy as np
@@ -18,30 +20,21 @@ import sys
 from pathlib import Path
 
 
-def train(config):
-    # subprocess.check_call([sys.executable, "-m", "pip", "install", "--editable",
-    #                        "git+https://github.com/alexliniger/gym-racecar@main#egg=gym-racecar"])
-
+def train(args,config):
     log_dir = 'logs'
     training_steps = config["steps"]
     action_obs = config["action_obs"]
-    # n_state = 6
-    # n_action = 2
-    # if action_obs:
-    #     n_obs = 9
-    # else:
-    #     n_obs = 7
 
     logs_dir = Path('logs')
     logs_dir.mkdir(parents=True, exist_ok=True)
 
-    env = gym.make('Pendulum-v0')
-    eval_env = gym.make('Pendulum-v0')
-    hard_eval_env = gym.make('Pendulum-v0')
+    # env = gym.make('Pendulum-v0')
+    # eval_env = gym.make('Pendulum-v0')
+    # hard_eval_env = gym.make('Pendulum-v0')
 
-    # env = gym.make('gym_racecar:RaceCar-v0', action_obs=action_obs)
-    # eval_env = gym.make('gym_racecar:RaceCar-v0', action_obs=action_obs)
-    # hard_eval_env = gym.make('gym_racecar:RaceCarRealistic-v0', action_obs=action_obs)
+    env = gym.make('gym_racecar:RaceCar-v0', action_obs=action_obs)
+    eval_env = gym.make('gym_racecar:RaceCar-v0', action_obs=action_obs)
+    hard_eval_env = gym.make('gym_racecar:RaceCarRealistic-v0', action_obs=action_obs)
 
     env = Monitor(env, log_dir)
 
@@ -50,7 +43,7 @@ def train(config):
                                                    log_path='./logs/',
                                                    eval_freq=config["eval_freq"], train_freq=config["rollout_steps"],
                                                    n_eval_episodes=10, n_final_eval_episodes=50,
-                                                   deterministic=True, render=False,
+                                                   deterministic=True, render=False, video=True,
                                                    wandb_name=config["wandb_name"], config=config)
 
     if config["activation_fn"] == "relu":
@@ -77,6 +70,19 @@ def train(config):
 
 if __name__ == '__main__':
 
+    parser = argparse.ArgumentParser()
+
+    # Data and model checkpoints directories
+    parser.add_argument('--backend', type=str, default=None,
+                        help='backend for distributed training (tcp, gloo on cpu and gloo, nccl on gpu)')
+
+    # Container environment
+    parser.add_argument('--hosts', type=list, default=json.jsonloads(os.environ['SM_HOSTS']))
+    parser.add_argument('--current-host', type=str, default=os.environ['SM_CURRENT_HOST'])
+    parser.add_argument('--model-dir', type=str, default=os.environ['SM_MODEL_DIR'])
+    #     parser.add_argument('--data-dir', type=str, default=os.environ['SM_CHANNEL_TRAINING'])
+    #     parser.add_argument('--num-gpus', type=int, default=os.environ['SM_NUM_GPUS'])
+
     config = json.load(open('config.json'))
 
-    train(config)
+    train(parser.parse_args(), config)

@@ -46,6 +46,7 @@ class WandbCallback(BaseCallback):
             best_model_save_path: str = None,
             deterministic: bool = True,
             render: bool = False,
+            video: bool = False,
             wandb_name: str = "test",
             config: dict = {},
             warn: bool = True,
@@ -59,6 +60,8 @@ class WandbCallback(BaseCallback):
         self.last_mean_reward = -np.inf
         self.deterministic = deterministic
         self.render = render
+        self.video = video
+        self.n_inputs = len(eval_env.action_space.shape)
 
         self.steps = 0
 
@@ -149,29 +152,38 @@ class WandbCallback(BaseCallback):
 
             eval_video_path = 'logs/videos/eval.mp4'
             video_length = 400
-            steering_list = []
-            duty_cycle_list = []
-            # Record the video starting at the first step
-            list_render = []
+
+            input_dict = {}
+            for m in range(self.n_inputs):
+                input_dict[m] = []
+
             obs = self.eval_env.reset()
-            list_render.append(self.eval_env.render(mode='rgb_array'))
-            for _ in range(video_length + 1):
-                action, _ = self.model.predict(obs)
-                steering_list.append(action[0][0])
-                # steering_list.append(action[0][1])
-                duty_cycle_list.append(action[0][0])
-                obs, _, _, _ = self.eval_env.step(action)
+            if self.video:
+                # Record the video starting at the first step
+                list_render = []
                 list_render.append(self.eval_env.render(mode='rgb_array'))
 
-            encoder = ImageEncoder(eval_video_path, list_render[0].shape, 30, 30)
-            for im in list_render:
-                encoder.capture_frame(im)
-            encoder.close()
+            for _ in range(video_length + 1):
+                action, _ = self.model.predict(obs)
+                for m in range(self.n_inputs):
+                    input_dict[m].append(action[0][m])
 
-            wandb.log({"action_eval/steering_box_hist": wandb.Histogram(steering_list)}, step=self.model.num_timesteps)
-            wandb.log({"action_eval/duty_cycle_box_hist": wandb.Histogram(duty_cycle_list)}, step=self.model.num_timesteps)
+                obs, _, _, _ = self.eval_env.step(action)
+                if self.video:
+                    list_render.append(self.eval_env.render(mode='rgb_array'))
 
-            wandb.log({f'video/{self.model.num_timesteps}': wandb.Video(eval_video_path)}, step=self.model.num_timesteps)
+            if self.video:
+                encoder = ImageEncoder(eval_video_path, list_render[0].shape, 30, 30)
+                for im in list_render:
+                    encoder.capture_frame(im)
+                encoder.close()
+
+                wandb.log({f'video/{self.model.num_timesteps}': wandb.Video(eval_video_path)},
+                          step=self.model.num_timesteps)
+
+            # log histogram with inputs
+            for m in range(self.n_inputs):
+                wandb.log({"action_eval/input"+str(m)+"_box_hist": wandb.Histogram(input_dict[m])}, step=self.model.num_timesteps)
 
         return True
 
@@ -215,30 +227,38 @@ class WandbCallback(BaseCallback):
         wandb.log({mode + "/ep_length_hist": wandb.plot.histogram(table_ep_length, value="length")})
 
         eval_video_path = 'logs/videos/'+mode+'_eval.mp4'
-        video_length = 400
-        steering_list = []
-        duty_cycle_list = []
-        # Record the video starting at the first step
-        list_render = []
-        obs = eval_env.reset()
-        list_render.append(eval_env.render(mode='rgb_array'))
+        input_dict = {}
+        for m in range(self.n_inputs):
+            input_dict[m] = []
+
+        obs = self.eval_env.reset()
+        if self.video:
+            # Record the video starting at the first step
+            list_render = []
+            list_render.append(self.eval_env.render(mode='rgb_array'))
+
         for _ in range(video_length + 1):
-            action, _ = model.predict(obs)
-            steering_list.append(action[0][0])
-            # steering_list.append(action[0][1])
-            duty_cycle_list.append(action[0][0])
-            obs, _, _, _ = eval_env.step(action)
-            list_render.append(eval_env.render(mode='rgb_array'))
+            action, _ = self.model.predict(obs)
+            for m in range(self.n_inputs):
+                input_dict[m].append(action[0][m])
 
-        encoder = ImageEncoder(eval_video_path, list_render[0].shape, 30, 30)
-        for im in list_render:
-            encoder.capture_frame(im)
-        encoder.close()
+            obs, _, _, _ = self.eval_env.step(action)
+            if self.video:
+                list_render.append(self.eval_env.render(mode='rgb_array'))
 
-        wandb.log({mode+"/steering_box_hist": wandb.Histogram(steering_list)}, step=self.model.num_timesteps)
-        wandb.log({mode+"/duty_cycle_box_hist": wandb.Histogram(duty_cycle_list)}, step=self.model.num_timesteps)
+        if self.video:
+            encoder = ImageEncoder(eval_video_path, list_render[0].shape, 30, 30)
+            for im in list_render:
+                encoder.capture_frame(im)
+            encoder.close()
 
-        wandb.log({mode+"/video": wandb.Video(eval_video_path)}, step=self.model.num_timesteps)
+            wandb.log({mode+"/video": wandb.Video(eval_video_path)}, step=self.model.num_timesteps)
+
+        # log histogram with inputs
+        for m in range(self.n_inputs):
+            wandb.log({mode+"/input" + str(m) + "_box_hist": wandb.Histogram(input_dict[m])},
+                      step=self.model.num_timesteps)
+
 
 
 
