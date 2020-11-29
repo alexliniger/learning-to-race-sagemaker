@@ -13,7 +13,7 @@
     "rollout_steps": 2048,
     "batch_size": 32,
     "n_epochs": 10,
-    "gamma": 0.99
+    "gamma": 0.99,
     "env": "racecar",
     "video_log": true
 }
