@@ -226,6 +226,7 @@ class WandbCallback(BaseCallback):
         wandb.log({mode + "/ep_length_hist": wandb.plot.histogram(table_ep_length, value="length")})
 
         eval_video_path = 'logs/videos/'+mode+'_eval.mp4'
+        video_length = 400
         input_dict = {}
         for m in range(self.n_inputs):
             input_dict[m] = []
