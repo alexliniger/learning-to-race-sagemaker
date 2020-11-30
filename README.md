@@ -13,19 +13,19 @@ The two main parts of the repo is a logging script using WandB (https://wandb.ai
 The base script uses PPO from stable baselines with default parameters. The RL agent learns to drive but cannot achieve good performance causing a significant amount of crashes as well as not driving very fast. Classical methods using Model Predictive Control (https://github.com/alexliniger/MPCC) achieve by far superior driving performance.
 
 ### After 10k steps
-<img src="https://github.com/alexliniger/learning-to-race-sagemaker/blob/main/video/output_10k.gif" width="700" />
+<img src="https://github.com/alexliniger/learning-to-race-sagemaker/blob/main/video/output_10k.gif" width="300" />
 
 ### After 500k steps
-<img src="https://github.com/alexliniger/learning-to-race-sagemaker/blob/main/video/output_500k.gif" width="700" />
+<img src="https://github.com/alexliniger/learning-to-race-sagemaker/blob/main/video/output_500k.gif" width="300" />
 
 ### After 1M steps
-<img src="https://github.com/alexliniger/learning-to-race-sagemaker/blob/main/video/output_1M.gif" width="700" />
+<img src="https://github.com/alexliniger/learning-to-race-sagemaker/blob/main/video/output_1M.gif" width="300" />
 
 ### After 2M steps
-<img src="https://github.com/alexliniger/learning-to-race-sagemaker/blob/main/video/output_2M.gif" width="700" />
+<img src="https://github.com/alexliniger/learning-to-race-sagemaker/blob/main/video/output_2M.gif" width="300" />
 
 ### After 3M steps
-<img src="https://github.com/alexliniger/learning-to-race-sagemaker/blob/main/video/output_3M.gif" width="700" />
+<img src="https://github.com/alexliniger/learning-to-race-sagemaker/blob/main/video/output_3M.gif" width="300" />
 
 ## Tasks
 - Investigate the learning behavior of PPO and investigate methods to improve the performance?
