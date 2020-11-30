@@ -252,12 +252,11 @@ class WandbCallback(BaseCallback):
                 encoder.capture_frame(im)
             encoder.close()
 
-            wandb.log({mode+"/video": wandb.Video(eval_video_path)}, step=self.model.num_timesteps)
+            wandb.log({mode+"/video": wandb.Video(eval_video_path)})
 
         # log histogram with inputs
         for m in range(self.n_inputs):
-            wandb.log({mode+"/input" + str(m) + "_box_hist": wandb.Histogram(input_dict[m])},
-                      step=self.model.num_timesteps)
+            wandb.log({mode+"/input" + str(m) + "_box_hist": wandb.Histogram(input_dict[m])})
 
 
 
